@@ -1,0 +1,24 @@
+#
+# Jenkins pipeline for CNaaS
+#
+
+disabled: false
+
+script:
+  - "python3.7 -m venv venv"
+  - ". venv/bin/activate"
+  - "pip install --upgrade setuptools pip wheel mypy"
+  - "pip install --index-url https://pypi.sunet.se -r requirements.txt"
+  - "nosetests --with-xunit"
+
+# slack:
+#   room: "cnaas"
+
+extra_jobs:
+  - name: cnaas-httpd
+    builders:
+      - docker
+    docker_name: cnaas/httpd
+    docker_context_dir: docker/httpd
+    docker_tags:
+      - "v0.1.0"
