@@ -1,10 +1,11 @@
-from flask import request
-from flask_restful import Resource
-from cnaas_httpd.api.generic import empty_result
-
+import os
 import ssl
 import shutil
 import urllib.request
+
+from flask import request
+from flask_restful import Resource
+from cnaas_httpd.api.generic import empty_result
 from hashlib import sha1
 
 
@@ -52,3 +53,11 @@ class FirmwareFetchApi(Resource):
         if res != '':
             return self.error(res)
         return empty_result(status='success')
+
+    def files_get(self):
+        return os.listdir('/opt/cnaas/www/firmware/')
+
+    def get(self):
+        files = self.files_get()
+        data = {'files': files}
+        return empty_result(status='success', data=data)
