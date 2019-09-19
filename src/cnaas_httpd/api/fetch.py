@@ -2,7 +2,9 @@ from flask import request
 from flask_restful import Resource
 from cnaas_httpd.api.generic import empty_result
 
-import urllib
+import ssl
+import shutil
+import urllib.request
 from hashlib import sha1
 
 
@@ -24,9 +26,11 @@ class FirmwareFetchApi(Resource):
     def file_download(self, url, checksum, filename):
         path = '/opt/cnaas/www/firmware/' + filename
         try:
-            urllib.request.urlretrieve(url, filename=path)
+            context=ssl._create_unverified_context()
+            with urllib.request.urlopen(url, timeout=120, context=context) as response, open(path, 'wb') as out_file:
+                shutil.copyfileobj(response, out_file)
         except Exception as e:
-            return e
+            return str(e)
         file_sha1 = self.file_sha1(path)
         if file_sha1 != checksum:
             return 'Checksum mismatch, file corrupt'
