@@ -14,6 +14,7 @@ COPY config/supervisord_app.conf /etc/supervisor/supervisord.conf
 COPY config/nginx_app.conf /etc/nginx/sites-available/
 COPY config/nginx.conf /etc/nginx/
 COPY cert/* /etc/nginx/conf.d/
+COPY http.sh /opt/cnaas/
 
 # Give nginx some special treatment
 RUN unlink /etc/nginx/sites-enabled/default
@@ -21,7 +22,8 @@ RUN ln -s /etc/nginx/sites-available/nginx_app.conf /etc/nginx/sites-enabled/def
 RUN chown www-data:www-data /var/log/nginx
 RUN chown -R  www-data:www-data /var/log/nginx/
 RUN chown -R www-data:www-data /var/lib/nginx
-RUN mkdir -p /opt/cnaas/www/firmware
+RUN mkdir -p /opt/cnaas/www/firmware/
+RUN mkdir /opt/cnaas/www/templates/
 RUN chown www-data:www-data /var/lib/nginx/
 RUN chown -R www-data:www-data /opt/cnaas
 
