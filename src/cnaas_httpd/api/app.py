@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_restful import Api
-from cnaas_httpd.api.fetch import FirmwareFetchApi, FirmwareImageApi
+from cnaas_httpd.api.firmware import FirmwareFetchApi, FirmwareImageApi
 from cnaas_httpd.version import __api_version__
 
 import os
