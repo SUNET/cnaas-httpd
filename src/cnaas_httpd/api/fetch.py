@@ -76,7 +76,8 @@ class FirmwareImageApi(Resource):
             sha1 = file_sha1(path)
         except Exception:
             return error('Could not find file ' + filename)
-        res = {'files': {filename: sha1}}
+        res = {'file': {'filename': filename,
+                        'sha1': sha1}}
         return empty_result(status='success', data=res)
 
     def delete(self, filename):
