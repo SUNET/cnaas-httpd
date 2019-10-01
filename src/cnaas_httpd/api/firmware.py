@@ -32,10 +32,13 @@ class FirmwareFetchApi(Resource):
     def files_get(self):
         return os.listdir(PATH)
 
-    def file_download(self, url, checksum, filename):
+    def file_download(self, url, checksum, filename, ssl_verify=None):
         path = PATH + filename
         try:
-            context=ssl._create_unverified_context()
+            if ssl_verify is not None:
+                context = ssl._create_unverified_context()
+            else:
+                context = None
             with urllib.request.urlopen(url, timeout=120, context=context) as response, open(path, 'wb') as out_file:
                 shutil.copyfileobj(response, out_file)
         except Exception as e:
@@ -53,12 +56,14 @@ class FirmwareFetchApi(Resource):
             return error('URL must be specified')
         if 'sha1' not in json_data:
             return error('Checksum must be specified')
+        if 'ssl_verify' not in json_data:
+            json_data['ssl_verify'] = None
 
         filename = self.url_parse(json_data['url'])
         if filename == '':
             return error('Invalid URL, could not parse filename')
         res = self.file_download(json_data['url'], json_data['sha1'],
-                                 filename)
+                                 filename, json_data['ssl_verify'])
         if res != '':
             return error(res)
         return empty_result(status='success')
