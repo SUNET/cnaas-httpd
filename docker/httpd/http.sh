@@ -7,7 +7,9 @@ then
 else
 	cd /opt/cnaas/www
 	rm -rf /opt/cnaas/www/templates
-	git clone $GITREPO_TEMPLATES templates
+        BRANCH=""
+        [ -n "$GITBRANCH_TEMPLATES" ] && BRANCH="-b $GITBRANCH_TEMPLATES"
+	git clone $BRANCH $GITREPO_TEMPLATES templates
 fi
 
 set -e
