@@ -17,14 +17,14 @@ router = APIRouter(tags=["firmware"])
 
 
 @router.get("/firmware")
-async def get_firmwares() -> GenericResponseModel[FirmwaresGetModel]:
+async def firmwares_get() -> GenericResponseModel[FirmwaresGetModel]:
     """List all firmwares"""
     files = os.listdir(PATH)
     return {"data": {"files": files}}
 
 
 @router.post("/firmware")
-async def post_firmwares(body: FirmwaresPostModel) -> GenericResponseModel[None]:
+async def firmwares_post(body: FirmwaresPostModel) -> GenericResponseModel[None]:
     """Download firmware image"""
     filename = body.url.path.split("/")[-1]
 
@@ -42,7 +42,7 @@ async def post_firmwares(body: FirmwaresPostModel) -> GenericResponseModel[None]
 
 
 @router.get("/firmware/{filename}")
-async def get_firmware(filename: str) -> GenericResponseModel[FirmwareGetModel]:
+async def firmware_get(filename: str) -> GenericResponseModel[FirmwareGetModel]:
     """Get firmware image"""
     path = PATH + filename
     if not os.path.exists(path):
