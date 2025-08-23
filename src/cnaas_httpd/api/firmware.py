@@ -1,94 +1,119 @@
 import os
-import ssl
-import shutil
-import urllib.request
+import re
 
-from flask import request
-from flask_restful import Resource
-from cnaas_httpd.api.generic import empty_result
-from hashlib import sha1
+from fastapi import APIRouter
+from fastapi.exceptions import HTTPException
 
+from cnaas_httpd.api.schemas import (
+    FirmwareGetModel,
+    FirmwaresGetModel,
+    FirmwaresPostModel,
+    GenericResponseModel,
+)
+from cnaas_httpd.api.utils import compute_file_hash, file_download
+from cnaas_httpd.constants import PATH
 
-PATH = '/opt/cnaas/www/firmware/'
-
-
-def file_sha1(fname):
-    hash_sha1 = sha1()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_sha1.update(chunk)
-    return hash_sha1.hexdigest()
+router = APIRouter(tags=["firmware"])
 
 
-def error(errstr):
-    return empty_result(status='error', data=errstr), 404
+@router.get("/firmware")
+async def get_firmwares() -> GenericResponseModel[FirmwaresGetModel]:
+    """List all firmwares"""
+    files = os.listdir(PATH)
+    return {"data": {"files": files}}
 
 
-class FirmwareFetchApi(Resource):
-    def url_parse(self, url):
-        parsed = urllib.parse.urlparse(url)
-        return parsed.path.split('/')[-1]
+@router.post("/firmware")
+async def post_firmwares(body: FirmwaresPostModel) -> GenericResponseModel[None]:
+    """Download firmware image"""
+    filename = body.url.path.split("/")[-1]
 
-    def files_get(self):
-        return os.listdir(PATH)
+    if filename == "":
+        raise HTTPException(
+            status_code=400, detail="Invalid URL, could not parse filename"
+        )
 
-    def file_download(self, url, checksum, filename, verify_tls=None):
-        path = PATH + filename
-        try:
-            if verify_tls is not None:
-                context = ssl._create_unverified_context()
-            else:
-                context = None
-            with urllib.request.urlopen(url, timeout=120, context=context) as response, open(path, 'wb') as out_file:
-                shutil.copyfileobj(response, out_file)
-        except Exception as e:
-            return str(e)
-        sha1 = file_sha1(path)
-        if sha1 != checksum:
-            os.remove(path)
-            return 'Checksum mismatch, file corrupt'
-        return ''
+    try:
+        file_download(body.url, filename, body.sha1, body.sha512, body.verify_tls)
+    except Exception:
+        raise  # re-raise the same exception
 
-    def post(self):
-        json_data = request.get_json()
-
-        if 'url' not in json_data:
-            return error('URL must be specified')
-        if 'sha1' not in json_data:
-            return error('Checksum must be specified')
-        if 'verify_tls' not in json_data:
-            json_data['verify_tls'] = None
-
-        filename = self.url_parse(json_data['url'])
-        if filename == '':
-            return error('Invalid URL, could not parse filename')
-        res = self.file_download(json_data['url'], json_data['sha1'],
-                                 filename, json_data['verify_tls'])
-        if res != '':
-            return error(res)
-        return empty_result(status='success')
-
-    def get(self):
-        files = self.files_get()
-        data = {'files': files}
-        return empty_result(status='success', data=data)
+    return {}
 
 
-class FirmwareImageApi(Resource):
-    def get(self, filename):
-        path = PATH + filename
-        try:
-            sha1 = file_sha1(path)
-        except Exception:
-            return error('Could not find file ' + filename)
-        res = {'file': {'filename': filename,
-                        'sha1': sha1}}
-        return empty_result(status='success', data=res)
+@router.get("/firmware/{filename}")
+async def get_firmware(filename: str) -> GenericResponseModel[FirmwareGetModel]:
+    """Get firmware image"""
+    path = PATH + filename
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+    try:
+        sha1 = compute_file_hash(path, "sha1")
+        sha521 = compute_file_hash(path, "sha512")
 
-    def delete(self, filename):
-        path = PATH + filename
-        try:
-            os.remove(path)
-        except Exception:
-            return error('Could not remove file ' + filename)
-        return empty_result(status='success')
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail=f"Could not extract sha512 from file: {filename}"
+        )
+    return {"data": {"file": {"filename": filename, "sha512": sha521, "sha1": sha1}}}
+
+
+@router.delete("/firmware/{filename}")
+async def firmware_delete(filename: str) -> GenericResponseModel:
+    """Delete firmware image"""
+    path = PATH + filename
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+    # Check if a symlink is assigned to the file
+    for entry in os.listdir(PATH):
+        full_path = os.path.join(PATH, entry)
+        if os.path.islink(full_path) and os.path.realpath(full_path) == path:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File: {filename} is symlinked to {entry}, delete the symlink first.",
+            )
+    try:
+        os.remove(path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Could not remove file {filename}: {e}"
+        )
+    return {}
+
+
+@router.post("/firmware/{filename}/set-default")
+async def firmware_set_stable(filename: str) -> GenericResponseModel:
+    """
+    Set the given firmware as the default/stable image.
+    Automatically generates a symlink like "prefix-stable.ext".
+    """
+    src_path = os.path.join(PATH, filename)
+
+    if not os.path.exists(src_path):
+        raise HTTPException(
+            status_code=404, detail=f"Firmware image not found: {filename}"
+        )
+
+    # Extract base prefix and extension
+    match = re.match(r"^([^.\\-]+)(?:[.-].*)?(\.[^.]+)$", filename)
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid firmware filename format")
+
+    prefix, ext = match.groups()
+    link_name = f"{prefix}-stable{ext}"
+    link_path = os.path.join(PATH, link_name)
+
+    try:
+        # Remove old symlink/file if it exists
+        if os.path.exists(link_path) or os.path.islink(link_path):
+            os.remove(link_path)
+
+        # Create new symlink
+        os.symlink(src_path, link_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Could not set default firmware symlink: {e}"
+        )
+
+    return {}
