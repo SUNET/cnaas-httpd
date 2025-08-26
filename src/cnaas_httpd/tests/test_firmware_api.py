@@ -2,6 +2,8 @@ import io
 import os
 from unittest.mock import patch
 
+from cnaas_httpd.api.utils import get_default_name
+
 # ----------------------------
 # Tests for FirmwareFetchApi
 # ----------------------------
@@ -269,21 +271,6 @@ def test_set_eos_default_firmware_symlink(client, firmware_directory):
     assert os.path.islink(expected2_link)
     assert os.readlink(expected2_link) == str(test2_file)
 
-    # GET the file from API and check default
-    response = client.get("/api/v1.0/firmware/EOS64-4.32.5M.swi")
-    data = response.json()
-    assert response.status_code == 200
-    assert data["status"] == "success"
-    assert data["data"]["file"]["default"] == "EOS64-stable.swi"
-
-    # GET the symlinked file from API and check default
-    response = client.get("/api/v1.0/firmware/EOS64-stable.swi")
-    data = response.json()
-    assert response.status_code == 200
-    assert data["status"] == "success"
-    # Should be None
-    assert not data["data"]["file"]["default"]
-
 
 def test_set_ios_default_firmware_symlink(client, firmware_directory):
     test_file = firmware_directory / "cat9k_lite_iosxe.17.12.05.SPA.bin"
@@ -313,6 +300,34 @@ def test_set_ios_default_firmware_symlink(client, firmware_directory):
     # Should be None
     assert not data["data"]["file"]["default"]
 
+def test_set_default_default_linked_to(client, firmware_directory):
+    filename = "EOS-4.32.6.1M.swi"
+    (firmware_directory / filename).write_text("fake firmware data")
+    
+    link_name = get_default_name(filename)
+    
+    assert link_name == "EOS-stable.swi"
+    
+    # Create the test symlink
+    os.symlink((firmware_directory / filename), (firmware_directory / link_name))
+    
+    # GET the file from API and check default and linked_to
+    response = client.get(f"/api/v1.0/firmware/{filename}")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "success"
+    assert data["data"]["file"]["default"] == link_name
+    # Should be None
+    assert not data["data"]["file"]["linked_to"]
+
+    # GET the symlinked file from API and check default and linked_to
+    response = client.get(f"/api/v1.0/firmware/{link_name}")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "success"
+    # Should be None
+    assert not data["data"]["file"]["default"]
+    assert data["data"]["file"]["linked_to"] == filename
 
 def test_set_default_not_found(client, firmware_directory):
     response = client.post("/api/v1.0/firmware/notfoundfile.bin/set-default")
