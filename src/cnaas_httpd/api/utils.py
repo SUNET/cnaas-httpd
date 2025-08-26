@@ -1,9 +1,9 @@
 import hashlib
 import os
+import re
 import shutil
 import ssl
 import urllib.request
-from typing import Optional
 
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
@@ -23,6 +23,17 @@ def compute_file_hash(file_path: str, algorithm: str = "sha512"):
             hash_func.update(chunk)
 
     return hash_func.hexdigest()
+
+
+def get_default_name(filename: str) -> str:
+    # Extract base prefix and extension
+    match = re.match(r"^([^.\\-]+)(?:[.-].*)?(\.[^.]+)$", filename)
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid firmware filename format")
+
+    prefix, ext = match.groups()
+    link_name = f"{prefix}-stable{ext}"
+    return link_name
 
 
 def file_download(
@@ -45,10 +56,10 @@ def file_download(
             shutil.copyfileobj(response, out_file)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    if sha1 is not None: # use sha1 if defined
+    if sha1 is not None:  # use sha1 if defined
         file_hash = compute_file_hash(path, "sha1")
         checksum_match = file_hash == sha1
-    else: # use 512
+    else:  # use 512
         file_hash = compute_file_hash(path, "sha512")
         checksum_match = file_hash == sha512
 
@@ -58,9 +69,7 @@ def file_download(
     return
 
 
-def validation_exception_handler(
-    _, exc: RequestValidationError
-) -> JSONResponse:
+def validation_exception_handler(_, exc: RequestValidationError) -> JSONResponse:
     # Displays only one error at a time.
     first_error = next((error.get("msg") for error in exc.errors()), "Invalid request")
 
