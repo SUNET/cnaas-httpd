@@ -59,6 +59,9 @@ async def firmware_get(filename: str) -> GenericResponseModel[FirmwareGetModel]:
     full_link_path = os.path.join(PATH, link_name)
     if os.path.islink(full_link_path) and os.path.realpath(full_link_path) == path:
         file_data["default"] = link_name
+    # Check if the file is a symlink
+    if os.path.islink(path):
+        file_data["linked_to"] = os.path.basename(os.path.realpath(path))
 
     return {"data": {"file": file_data}}
 
