@@ -51,16 +51,19 @@ def test_post_wrong_sha1(client):
     assert data["status"] == "error"
     assert "sha1 must be a 40-character hex string" in data["message"]
 
+
 def test_post_wrong_sha512(client):
     """POST should fail if sha1 is the wrong format"""
     response = client.post(
-        "/api/v1.0/firmware", json={"url": "http://example.com/fw.bin", "sha512": "wrong"}
+        "/api/v1.0/firmware",
+        json={"url": "http://example.com/fw.bin", "sha512": "wrong"},
     )
     data = response.json()
 
     assert response.status_code == 400
     assert data["status"] == "error"
     assert "sha512 must be a 128-character hex string" in data["message"]
+
 
 def test_post_invalid_url_parsing(client):
     """POST should fail on bad URL"""
@@ -206,6 +209,8 @@ def test_image_get_success(client):
         data["data"]["file"]["sha512"]
         == "84ff6e12461adace2b87e8e97186d9afab3d96e34f18fa34e52ebf5e1608b04d927a08142e4cee930a353f9c010e3e57cb5cbfbfe42c542f4a1baeea819c98ad"
     )
+    # default = None
+    assert not data["data"]["file"]["default"]
 
 
 def test_image_get_not_found(client):
@@ -264,6 +269,13 @@ def test_set_eos_default_firmware_symlink(client, firmware_directory):
     assert os.path.islink(expected2_link)
     assert os.readlink(expected2_link) == str(test2_file)
 
+    # GET the file from API and check default
+    response = client.get("/api/v1.0/firmware/EOS64-4.32.5M.swi")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "success"
+    assert data["data"]["file"]["default"] == "EOS64-stable.swi"
+
 
 def test_set_ios_default_firmware_symlink(client, firmware_directory):
     test_file = firmware_directory / "cat9k_lite_iosxe.17.12.05.SPA.bin"
@@ -277,6 +289,13 @@ def test_set_ios_default_firmware_symlink(client, firmware_directory):
     assert data["status"] == "success"
     assert os.path.islink(expected_link)
     assert os.readlink(expected_link) == str(test_file)
+
+    # GET the file from API and check default
+    response = client.get("/api/v1.0/firmware/cat9k_lite_iosxe.17.12.05.SPA.bin")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "success"
+    assert data["data"]["file"]["default"] == "cat9k_lite_iosxe-stable.bin"
 
 
 def test_set_default_not_found(client, firmware_directory):
