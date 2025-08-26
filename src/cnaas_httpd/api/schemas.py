@@ -70,6 +70,7 @@ class FirmwareFileModel(BaseModel):
     filename: str
     sha1: str
     sha512: str
+    default: Optional[str] = None
 
 
 class FirmwareGetModel(BaseModel):
