@@ -105,9 +105,6 @@ async def firmware_set_stable(filename: str) -> GenericResponseModel:
     except Exception:
         raise
     link_path = os.path.join(PATH, link_name)
-    
-
-    
 
     try:
         # Remove old symlink/file if it exists
