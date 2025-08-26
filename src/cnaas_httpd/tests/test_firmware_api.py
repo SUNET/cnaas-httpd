@@ -276,6 +276,14 @@ def test_set_eos_default_firmware_symlink(client, firmware_directory):
     assert data["status"] == "success"
     assert data["data"]["file"]["default"] == "EOS64-stable.swi"
 
+    # GET the symlinked file from API and check default
+    response = client.get("/api/v1.0/firmware/EOS64-stable.swi")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "success"
+    # Should be None
+    assert not data["data"]["file"]["default"]
+
 
 def test_set_ios_default_firmware_symlink(client, firmware_directory):
     test_file = firmware_directory / "cat9k_lite_iosxe.17.12.05.SPA.bin"
@@ -296,6 +304,14 @@ def test_set_ios_default_firmware_symlink(client, firmware_directory):
     assert response.status_code == 200
     assert data["status"] == "success"
     assert data["data"]["file"]["default"] == "cat9k_lite_iosxe-stable.bin"
+
+    # GET the symlinked file from API and check default
+    response = client.get("/api/v1.0/firmware/cat9k_lite_iosxe-stable.bin")
+    data = response.json()
+    assert response.status_code == 200
+    assert data["status"] == "success"
+    # Should be None
+    assert not data["data"]["file"]["default"]
 
 
 def test_set_default_not_found(client, firmware_directory):
