@@ -1,5 +1,4 @@
 import os
-import re
 
 from fastapi import APIRouter
 from fastapi.exceptions import HTTPException
@@ -10,21 +9,21 @@ from cnaas_httpd.api.schemas import (
     FirmwaresPostModel,
     GenericResponseModel,
 )
-from cnaas_httpd.api.utils import compute_file_hash, file_download
+from cnaas_httpd.api.utils import compute_file_hash, file_download, get_default_name
 from cnaas_httpd.constants import PATH
 
 router = APIRouter(tags=["firmware"])
 
 
 @router.get("/firmware")
-async def get_firmwares() -> GenericResponseModel[FirmwaresGetModel]:
+async def firmwares_get() -> GenericResponseModel[FirmwaresGetModel]:
     """List all firmwares"""
     files = os.listdir(PATH)
     return {"data": {"files": files}}
 
 
 @router.post("/firmware")
-async def post_firmwares(body: FirmwaresPostModel) -> GenericResponseModel[None]:
+async def firmwares_post(body: FirmwaresPostModel) -> GenericResponseModel[None]:
     """Download firmware image"""
     filename = body.url.path.split("/")[-1]
 
@@ -42,31 +41,32 @@ async def post_firmwares(body: FirmwaresPostModel) -> GenericResponseModel[None]
 
 
 @router.get("/firmware/{filename}")
-async def get_firmware(filename: str) -> GenericResponseModel[FirmwareGetModel]:
+async def firmware_get(filename: str) -> GenericResponseModel[FirmwareGetModel]:
     """Get firmware image"""
+    file_data = {"filename": filename}
     path = PATH + filename
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
     try:
-        md5 = compute_file_hash(path, "md5")
-        sha1 = compute_file_hash(path, "sha1")
-        sha256 = compute_file_hash(path, "sha256")
-        sha512 = compute_file_hash(path, "sha512")
+        file_data["md5"] = compute_file_hash(path, "md5")
+        file_data["sha1"] = compute_file_hash(path, "sha1")
+        file_data["sha256"] = compute_file_hash(path, "sha256")
+        file_data["sha512"] = compute_file_hash(path, "sha512")
     except Exception:
         raise HTTPException(
-            status_code=500, detail=f"Could not extract sha512 from file: {filename}"
+            status_code=500, detail=f"Could not extract checksum from file: {filename}"
         )
-    return {
-        "data": {
-            "file": {
-                "filename": filename,
-                "md5": md5,
-                "sha1": sha1,
-                "sha256": sha256,
-                "sha512": sha512,
-            }
-        }
-    }
+
+    # Check if this file have a symlink to a default file
+    link_name = get_default_name(filename)
+    full_link_path = os.path.join(PATH, link_name)
+    if os.path.islink(full_link_path) and os.path.realpath(full_link_path) == path:
+        file_data["default"] = link_name
+    # Check if the file is a symlink
+    if os.path.islink(path):
+        file_data["linked_to"] = os.path.basename(os.path.realpath(path))
+
+    return {"data": {"file": file_data}}
 
 
 @router.delete("/firmware/{filename}")
@@ -106,13 +106,10 @@ async def firmware_set_stable(filename: str) -> GenericResponseModel:
             status_code=404, detail=f"Firmware image not found: {filename}"
         )
 
-    # Extract base prefix and extension
-    match = re.match(r"^([^.\\-]+)(?:[.-].*)?(\.[^.]+)$", filename)
-    if not match:
-        raise HTTPException(status_code=400, detail="Invalid firmware filename format")
-
-    prefix, ext = match.groups()
-    link_name = f"{prefix}-stable{ext}"
+    try:
+        link_name = get_default_name(filename)
+    except Exception:
+        raise
     link_path = os.path.join(PATH, link_name)
 
     try:

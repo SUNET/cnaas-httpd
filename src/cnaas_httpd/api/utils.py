@@ -1,9 +1,9 @@
 import hashlib
 import os
+import re
 import shutil
 import ssl
 import urllib.request
-from typing import Optional
 
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
@@ -23,6 +23,17 @@ def compute_file_hash(file_path: str, algorithm: str = "sha512"):
             hash_func.update(chunk)
 
     return hash_func.hexdigest()
+
+
+def get_default_name(filename: str) -> str:
+    # Extract base prefix and extension
+    match = re.match(r"^([^.\\-]+)(?:[.-].*)?(\.[^.]+)$", filename)
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid firmware filename format")
+
+    prefix, ext = match.groups()
+    link_name = f"{prefix}-stable{ext}"
+    return link_name
 
 
 def file_download(
