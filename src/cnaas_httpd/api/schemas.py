@@ -97,7 +97,7 @@ class FirmwaresPostModel(BaseModel):
             if "url" not in data:
                 raise ValueError("url must be specified")
             if "checksum" not in data:
-                raise ValueError("Field: checksum must be specified")
+                raise ValueError("checksum must be specified")
         return data
 
 
