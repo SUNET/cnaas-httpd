@@ -32,13 +32,29 @@ class ChecksumModel(BaseModel):
     algorithm: str
     checksum: str
 
+    # Custom error messages
+    @model_validator(mode="before")
+    @classmethod
+    def check_fields_not_present(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "algorithm" not in data:
+                raise ValueError("algorithm must be specified")
+            if "checksum" not in data:
+                raise ValueError("checksum must be specified")
+            if not isinstance(data.get("algorithm"), str):
+                raise ValueError("algorithm must be a string")
+            if not isinstance(data.get("checksum"), str):
+                raise ValueError("checksum must be a string")
+
+        return data
+
     @field_validator("algorithm")
     @classmethod
     def validate_algorithm(cls, v: str) -> str:
         v = v.lower()
         if v not in hashlib.algorithms_available:
             raise ValueError(
-                f"Unsupported algorithm '{v}'. "
+                f"unsupported algorithm '{v}'. "
                 f"Supported algorithms: {', '.join(sorted(hashlib.algorithms_available))}"
             )
         return v
@@ -89,7 +105,7 @@ class FirmwaresPostModel(BaseModel):
             data["checksum"] = {"algorithm": "sha1", "checksum": sha1_checksum}
         super().__init__(**data)
 
-    # Custom error message for missing fields
+    # Custom error messages
     @model_validator(mode="before")
     @classmethod
     def check_fields_not_present(cls, data: Any) -> Any:
@@ -98,6 +114,10 @@ class FirmwaresPostModel(BaseModel):
                 raise ValueError("url must be specified")
             if "checksum" not in data:
                 raise ValueError("checksum must be specified")
+            if type(data.get("checksum")) is not dict:
+                raise ValueError(
+                    "checksum must be an object with algorithm and checksum"
+                )
         return data
 
 
