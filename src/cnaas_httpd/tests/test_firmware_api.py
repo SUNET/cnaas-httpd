@@ -20,7 +20,10 @@ def test_get_firmware_list(client):
 
 def test_post_missing_url(client):
     """POST should fail if URL is missing"""
-    response = client.post("/api/v1.0/firmware", json={"sha512": "abc"})
+    response = client.post(
+        "/api/v1.0/firmware",
+        json={"checksum": {"algorithm": "sha512", "checksum": "abc"}},
+    )
     data = response.json()
 
     assert response.status_code == 400
@@ -29,7 +32,7 @@ def test_post_missing_url(client):
 
 
 def test_post_missing_checksum(client):
-    """POST should fail if sha1 or sha512 is missing"""
+    """POST should fail if sha1 or checksum is missing"""
     response = client.post(
         "/api/v1.0/firmware", json={"url": "http://example.com/fw.bin"}
     )
@@ -37,7 +40,7 @@ def test_post_missing_checksum(client):
 
     assert response.status_code == 400
     assert data["status"] == "error"
-    assert "one of sha1 or sha512" in data["message"]
+    assert "checksum must be specified" in data["message"]
 
 
 def test_post_wrong_sha1(client):
@@ -49,23 +52,30 @@ def test_post_wrong_sha1(client):
 
     assert response.status_code == 400
     assert data["status"] == "error"
-    assert "sha1 must be a 40-character hex string" in data["message"]
+    assert "Checksum must be a 40-character hex string" in data["message"]
+
 
 def test_post_wrong_sha512(client):
     """POST should fail if sha1 is the wrong format"""
     response = client.post(
-        "/api/v1.0/firmware", json={"url": "http://example.com/fw.bin", "sha512": "wrong"}
+        "/api/v1.0/firmware",
+        json={
+            "url": "http://example.com/fw.bin",
+            "checksum": {"algorithm": "sha512", "checksum": "wrong"},
+        },
     )
     data = response.json()
 
     assert response.status_code == 400
     assert data["status"] == "error"
-    assert "sha512 must be a 128-character hex string" in data["message"]
+    assert "Checksum must be a 128-character hex string" in data["message"]
+
 
 def test_post_invalid_url_parsing(client):
     """POST should fail on bad URL"""
     response = client.post(
-        "/api/v1.0/firmware", json={"url": "http://", "sha512": "abc"}
+        "/api/v1.0/firmware",
+        json={"url": "http://", "checksum": {"algorithm": "sha512", "checksum": "abc"}},
     )
     data = response.json()
 
@@ -75,7 +85,11 @@ def test_post_invalid_url_parsing(client):
 
     # No filename set
     response = client.post(
-        "/api/v1.0/firmware", json={"url": "http://example.com", "sha512": "A" * 128}
+        "/api/v1.0/firmware",
+        json={
+            "url": "http://example.com",
+            "checksum": {"algorithm": "sha512", "checksum": "A" * 128},
+        },
     )
     data = response.json()
 
@@ -107,7 +121,11 @@ def test_post_successful_download(
     # Test download using sha512
     response = client.post(
         "/api/v1.0/firmware",
-        json={"url": url, "sha512": checksum_sha512, "verify_tls": None},
+        json={
+            "url": url,
+            "checksum": {"algorithm": "sha512", "checksum": checksum_sha512},
+            "verify_tls": None,
+        },
     )
 
     data = response.json()
@@ -174,7 +192,11 @@ def test_post_checksum_mismatch(
     # sha512 download fail
     response = client.post(
         "/api/v1.0/firmware",
-        json={"url": url, "sha512": checksum_sha512, "verify_tls": False},
+        json={
+            "url": url,
+            "checksum": {"algorithm": "sha512", "checksum": checksum_sha512},
+            "verify_tls": False,
+        },
     )
 
     data = response.json()
@@ -199,8 +221,15 @@ def test_image_get_success(client):
     data = response.json()
     assert response.status_code == 200
     assert data["status"] == "success"
+    # md5
+    assert data["data"]["file"]["md5"] == "f19a8969e6c969dd9b7e1a7a23a270af"
     # sha1
     assert data["data"]["file"]["sha1"] == "6c6264482e9930da144bab69c1af3dcb13c37f85"
+    # sha256
+    assert (
+        data["data"]["file"]["sha256"]
+        == "fd80d3c8db7ad061609edbb5ed0260dec90336dc258d2c9559b2cae4beb28038"
+    )
     # sha512
     assert (
         data["data"]["file"]["sha512"]
