@@ -34,7 +34,7 @@ async def post_firmwares(body: FirmwaresPostModel) -> GenericResponseModel[None]
         )
 
     try:
-        file_download(body.url, filename, body.sha1, body.sha512, body.verify_tls)
+        file_download(body.url, filename, body.checksum, body.verify_tls)
     except Exception:
         raise  # re-raise the same exception
 
@@ -48,14 +48,25 @@ async def get_firmware(filename: str) -> GenericResponseModel[FirmwareGetModel]:
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
     try:
+        md5 = compute_file_hash(path, "md5")
         sha1 = compute_file_hash(path, "sha1")
-        sha521 = compute_file_hash(path, "sha512")
-
+        sha256 = compute_file_hash(path, "sha256")
+        sha512 = compute_file_hash(path, "sha512")
     except Exception:
         raise HTTPException(
             status_code=500, detail=f"Could not extract sha512 from file: {filename}"
         )
-    return {"data": {"file": {"filename": filename, "sha512": sha521, "sha1": sha1}}}
+    return {
+        "data": {
+            "file": {
+                "filename": filename,
+                "md5": md5,
+                "sha1": sha1,
+                "sha256": sha256,
+                "sha512": sha512,
+            }
+        }
+    }
 
 
 @router.delete("/firmware/{filename}")

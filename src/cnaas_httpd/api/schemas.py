@@ -1,5 +1,7 @@
+import hashlib
 import re
-from typing import Annotated, Any, Generic, List, Literal, Optional, TypeVar
+import warnings
+from typing import Annotated, Any, Generic, List, Literal, Optional, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -26,14 +28,66 @@ class FirmwaresGetModel(BaseModel):
     files: Optional[List] = []
 
 
+class ChecksumModel(BaseModel):
+    algorithm: str
+    checksum: str
+
+    @field_validator("algorithm")
+    @classmethod
+    def validate_algorithm(cls, v: str) -> str:
+        v = v.lower()
+        if v not in hashlib.algorithms_available:
+            raise ValueError(
+                f"Unsupported algorithm '{v}'. "
+                f"Supported algorithms: {', '.join(sorted(hashlib.algorithms_available))}"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def validate_algorithm_checksum_match(self: Self) -> Self:
+        expected_len = None
+        algo = self.algorithm.lower()
+
+        # Try creating a hash object to dynamically get digest size
+        try:
+            hash_obj = hashlib.new(algo)
+            expected_len = (
+                hash_obj.digest_size * 2
+            )  # hex string length = digest size * 2
+        except ValueError:
+            raise ValueError(f"Unsupported algorithm '{algo}'")
+
+        # Validate checksum matches expected hex length
+        if not re.fullmatch(rf"[a-fA-F0-9]{{{expected_len}}}", self.checksum):
+            raise ValueError(
+                f"Checksum must be a {expected_len}-character hex string for algorithm '{algo}'"
+            )
+
+        return self
+
+
 class FirmwaresPostModel(BaseModel):
     url: Annotated[
         HttpUrl,
         Field(..., examples=["https://example.com/fw.bin"]),
     ]
-    sha1: Optional[str] = None
-    sha512: Optional[str] = None
+    checksum: ChecksumModel
     verify_tls: Optional[bool] = False
+
+    def __init__(self, **data):
+        # Handle deprecated sha1 field
+        # Convert to checksum field if sha1 is provided
+        # Using sha1 will override checksum field if both are provided
+        if "sha1" in data:
+            warnings.warn(
+                "Directly sending sha1 is deprecated, use the checksum field instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            sha1_checksum = data.pop("sha1")
+
+            data["checksum"] = {"algorithm": "sha1", "checksum": sha1_checksum}
+        super().__init__(**data)
 
     # Custom error message for missing fields
     @model_validator(mode="before")
@@ -42,33 +96,16 @@ class FirmwaresPostModel(BaseModel):
         if isinstance(data, dict):
             if "url" not in data:
                 raise ValueError("url must be specified")
+            if "checksum" not in data:
+                raise ValueError("Field: checksum must be specified")
         return data
-
-    @field_validator("sha1")
-    @classmethod
-    def validate_sha1(cls, v):
-        if not re.fullmatch(r"[a-fA-F0-9]{40}", v):
-            raise ValueError("sha1 must be a 40-character hex string")
-        return v
-
-    # validate sha512 value if provided
-    @field_validator("sha512")
-    @classmethod
-    def validate_sha512(cls, v):
-        if not re.fullmatch(r"[a-fA-F0-9]{128}", v):
-            raise ValueError("sha512 must be a 128-character hex string")
-        return v
-
-    @model_validator(mode="after")
-    def check_exclusive_sha(self):
-        if bool(self.sha1) == bool(self.sha512):  # both None or both set
-            raise ValueError("You must provide exactly one of sha1 or sha512")
-        return self
 
 
 class FirmwareFileModel(BaseModel):
     filename: str
+    md5: str
     sha1: str
+    sha256: str
     sha512: str
 
 

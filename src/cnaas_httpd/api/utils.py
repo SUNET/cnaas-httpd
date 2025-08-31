@@ -9,7 +9,7 @@ from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import HttpUrl
 
-from cnaas_httpd.api.schemas import ErrorModel
+from cnaas_httpd.api.schemas import ErrorModel, ChecksumModel
 from cnaas_httpd.constants import PATH
 
 
@@ -28,8 +28,7 @@ def compute_file_hash(file_path: str, algorithm: str = "sha512"):
 def file_download(
     url: HttpUrl,
     filename: str,
-    sha1: str,
-    sha512: str,
+    checksum: ChecksumModel,
     verify_tls: bool,
 ):
     path = PATH + filename
@@ -45,12 +44,9 @@ def file_download(
             shutil.copyfileobj(response, out_file)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    if sha1 is not None: # use sha1 if defined
-        file_hash = compute_file_hash(path, "sha1")
-        checksum_match = file_hash == sha1
-    else: # use 512
-        file_hash = compute_file_hash(path, "sha512")
-        checksum_match = file_hash == sha512
+
+    file_hash = compute_file_hash(path, checksum.algorithm)
+    checksum_match = file_hash == checksum.checksum
 
     if not checksum_match:
         os.remove(path)
@@ -58,9 +54,7 @@ def file_download(
     return
 
 
-def validation_exception_handler(
-    _, exc: RequestValidationError
-) -> JSONResponse:
+def validation_exception_handler(_, exc: RequestValidationError) -> JSONResponse:
     # Displays only one error at a time.
     first_error = next((error.get("msg") for error in exc.errors()), "Invalid request")
 
