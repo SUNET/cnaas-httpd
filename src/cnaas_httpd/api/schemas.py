@@ -1,7 +1,7 @@
 import hashlib
 import re
 import warnings
-from typing import Annotated, Any, Generic, List, Literal, Optional, Self, TypeVar
+from typing import Annotated, Any, Dict, Generic, List, Literal, Optional, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -24,8 +24,14 @@ class GenericResponseModel(BaseModel, Generic[T]):
     data: Optional[T] = None
 
 
+class FirmwaresGetDefaultModel(BaseModel):
+    file: str
+    default: str
+
+
 class FirmwaresGetModel(BaseModel):
-    files: Optional[List] = []
+    files: Optional[List[str]] = []
+    defaults: Optional[List[FirmwaresGetDefaultModel]] = {}
 
 
 class ChecksumModel(BaseModel):
@@ -127,12 +133,6 @@ class FirmwareFileModel(BaseModel):
     sha1: str
     sha256: str
     sha512: str
-    default: Annotated[
-        Optional[str], Field(description="Default file name if file is set as default")
-    ] = None
-    linked_to: Annotated[
-        Optional[str], Field(description="Linked file name if file is a symlink")
-    ] = None
 
 
 class FirmwareGetModel(BaseModel):

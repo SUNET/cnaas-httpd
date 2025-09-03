@@ -2,8 +2,6 @@ import io
 import os
 from unittest.mock import patch
 
-from cnaas_httpd.api.utils import get_default_name
-
 # ----------------------------
 # Tests for FirmwareFetchApi
 # ----------------------------
@@ -17,7 +15,16 @@ def test_get_firmware_list(client):
 
     assert response.status_code == 200
     assert data["status"] == "success"
-    assert sorted(data["data"]["files"]) == ["fw1.bin", "fw2.bin", "fw3.bin"]
+    assert sorted(data["data"]["files"]) == [
+        "fw1-stable.bin",
+        "fw1.bin",
+        "fw2.bin",
+        "fw3.bin",
+    ]
+    # Test defaults list
+    assert len(data["data"]["defaults"]) == 1
+    assert data["data"]["defaults"][0]["file"] == "fw1.bin"
+    assert data["data"]["defaults"][0]["default"] == "fw1-stable.bin"
 
 
 def test_post_missing_url(client):
@@ -237,8 +244,6 @@ def test_image_get_success(client):
         data["data"]["file"]["sha512"]
         == "84ff6e12461adace2b87e8e97186d9afab3d96e34f18fa34e52ebf5e1608b04d927a08142e4cee930a353f9c010e3e57cb5cbfbfe42c542f4a1baeea819c98ad"
     )
-    # default = None
-    assert not data["data"]["file"]["default"]
 
 
 def test_image_get_not_found(client):
@@ -310,51 +315,6 @@ def test_set_ios_default_firmware_symlink(client, firmware_directory):
     assert data["status"] == "success"
     assert os.path.islink(expected_link)
     assert os.readlink(expected_link) == str(test_file)
-
-    # GET the file from API and check default
-    response = client.get("/api/v1.0/firmware/cat9k_lite_iosxe.17.12.05.SPA.bin")
-    data = response.json()
-    assert response.status_code == 200
-    assert data["status"] == "success"
-    assert data["data"]["file"]["default"] == "cat9k_lite_iosxe-stable.bin"
-
-    # GET the symlinked file from API and check default
-    response = client.get("/api/v1.0/firmware/cat9k_lite_iosxe-stable.bin")
-    data = response.json()
-    assert response.status_code == 200
-    assert data["status"] == "success"
-    # Should be None
-    assert not data["data"]["file"]["default"]
-
-
-def test_set_default_default_linked_to(client, firmware_directory):
-    filename = "EOS-4.32.6.1M.swi"
-    (firmware_directory / filename).write_text("fake firmware data")
-
-    link_name = get_default_name(filename)
-
-    assert link_name == "EOS-stable.swi"
-
-    # Create the test symlink
-    os.symlink((firmware_directory / filename), (firmware_directory / link_name))
-
-    # GET the file from API and check default and linked_to
-    response = client.get(f"/api/v1.0/firmware/{filename}")
-    data = response.json()
-    assert response.status_code == 200
-    assert data["status"] == "success"
-    assert data["data"]["file"]["default"] == link_name
-    # Should be None
-    assert not data["data"]["file"]["linked_to"]
-
-    # GET the symlinked file from API and check default and linked_to
-    response = client.get(f"/api/v1.0/firmware/{link_name}")
-    data = response.json()
-    assert response.status_code == 200
-    assert data["status"] == "success"
-    # Should be None
-    assert not data["data"]["file"]["default"]
-    assert data["data"]["file"]["linked_to"] == filename
 
 
 def test_set_default_not_found(client, firmware_directory):

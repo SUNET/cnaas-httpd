@@ -19,7 +19,16 @@ router = APIRouter(tags=["firmware"])
 async def firmwares_get() -> GenericResponseModel[FirmwaresGetModel]:
     """List all firmwares"""
     files = os.listdir(PATH)
-    return {"data": {"files": files}}
+    defaults = []
+    for file in files:
+        # Skip non symlinks
+        full_path = os.path.join(PATH, file)
+        if not os.path.islink(full_path):
+            continue
+        real_file_name = os.path.basename(os.path.realpath(full_path))
+        # If it is a symlink add to defaults
+        defaults.append({"file": real_file_name, "default": file})
+    return {"data": {"files": files, "defaults": defaults}}
 
 
 @router.post("/firmware")
@@ -57,15 +66,6 @@ async def firmware_get(filename: str) -> GenericResponseModel[FirmwareGetModel]:
         raise HTTPException(
             status_code=500, detail=f"Could not extract checksum from file: {filename}"
         )
-
-    # Check if this file have a symlink to a default file
-    link_name = get_default_name(filename)
-    full_link_path = os.path.join(PATH, link_name)
-    if os.path.islink(full_link_path) and os.path.realpath(full_link_path) == path:
-        file_data["default"] = link_name
-    # Check if the file is a symlink
-    if os.path.islink(path):
-        file_data["linked_to"] = os.path.basename(os.path.realpath(path))
 
     return {"data": {"file": file_data}}
 
