@@ -45,13 +45,14 @@ async def firmware_get(filename: str) -> GenericResponseModel[FirmwareGetModel]:
     """Get firmware image"""
     file_data = {"filename": filename}
     path = PATH + filename
+    real_path = os.path.realpath(path)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
     try:
-        file_data["md5"] = compute_file_hash(path, "md5")
-        file_data["sha1"] = compute_file_hash(path, "sha1")
-        file_data["sha256"] = compute_file_hash(path, "sha256")
-        file_data["sha512"] = compute_file_hash(path, "sha512")
+        file_data["md5"] = compute_file_hash(real_path, "md5")
+        file_data["sha1"] = compute_file_hash(real_path, "sha1")
+        file_data["sha256"] = compute_file_hash(real_path, "sha256")
+        file_data["sha512"] = compute_file_hash(real_path, "sha512")
     except Exception:
         raise HTTPException(
             status_code=500, detail=f"Could not extract checksum from file: {filename}"
@@ -86,6 +87,8 @@ async def firmware_delete(filename: str) -> GenericResponseModel:
             )
     try:
         os.remove(path)
+        # Clear cache incase another file with the same name is downloaded but with another hash.
+        compute_file_hash.cache_clear()
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Could not remove file {filename}: {e}"

@@ -4,15 +4,17 @@ import re
 import shutil
 import ssl
 import urllib.request
+from functools import cache
 
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import HttpUrl
 
-from cnaas_httpd.api.schemas import ErrorModel, ChecksumModel
+from cnaas_httpd.api.schemas import ChecksumModel, ErrorModel
 from cnaas_httpd.constants import PATH
 
 
+@cache
 def compute_file_hash(file_path: str, algorithm: str = "sha512"):
     """Compute the hash of a file using the specified algorithm."""
     hash_func = hashlib.new(algorithm)
