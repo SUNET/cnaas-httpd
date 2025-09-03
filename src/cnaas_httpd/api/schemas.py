@@ -88,7 +88,7 @@ class FirmwaresPostModel(BaseModel):
         Field(..., examples=["https://example.com/fw.bin"]),
     ]
     checksum: ChecksumModel
-    verify_tls: Optional[bool] = False
+    verify_tls: Optional[bool] = True
 
     def __init__(self, **data):
         # Handle deprecated sha1 field
