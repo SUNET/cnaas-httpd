@@ -13,6 +13,8 @@ def firmware_directory(tmp_path_factory):
     (firmware_dir / "fw1.bin").write_text("some-fake-data-1")
     (firmware_dir / "fw2.bin").write_text("some-fake-data-2")
     (firmware_dir / "fw3.bin").write_text("some-fake-data-3")
+    # Add symlink to test-data
+    (firmware_dir / "fw1-stable.bin").symlink_to((firmware_dir / "fw1.bin"))
     return firmware_dir
 
 
