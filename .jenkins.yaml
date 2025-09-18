@@ -23,4 +23,4 @@ extra_jobs:
     docker_name: cnaas/httpd
     docker_context_dir: .
     docker_tags:
-      - "v0.1.0"
+      - "v1.8.0"
