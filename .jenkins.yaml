@@ -18,8 +18,9 @@ extra_jobs:
   - name: cnaas-httpd
     builders:
       - docker
+    pre_build_script:
+      - cp docker/httpd/Dockerfile .
     docker_name: cnaas/httpd
     docker_context_dir: .
-    docker_build_args: "file=docker/httpd/Dockerfile"
     docker_tags:
       - "v0.1.0"
