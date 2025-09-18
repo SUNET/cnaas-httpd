@@ -1,4 +1,4 @@
-__version__ = '0.2.0.dev0'
+__version__ = '1.8.0b1'
 __version_info__ = tuple(__version__.split('.'))
 __api_version__ = 'v1.0'
 
