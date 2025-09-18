@@ -19,7 +19,7 @@ RUN python3 -m venv /opt/cnaas/venv
 ENV PATH="/opt/cnaas/venv/bin:$PATH"
 
 WORKDIR /opt/cnaas
-COPY ../../requirements.txt .
+COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
