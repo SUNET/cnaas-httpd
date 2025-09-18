@@ -20,6 +20,6 @@ extra_jobs:
       - docker
     docker_name: cnaas/httpd
     docker_context_dir: .
-    docker_build_args: "-f docker/httpd/Dockerfile"
+    docker_build_args: "file=docker/httpd/Dockerfile"
     docker_tags:
       - "v0.1.0"
